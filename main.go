@@ -1,13 +1,12 @@
 package main
 
 import (
-	"bytes"
-	"encoding/json"
-	"errors"
+	"bufio"
 	"fmt"
 	"io/ioutil"
 	"net/http"
 	"os"
+	"strings"
 )
 
 func check(info string, err error) {
@@ -31,53 +30,38 @@ func main() {
 	fmt.Println("Connected to the BuildingTransparency API")
 	fmt.Println("  with authentication token =", authKey)
 
+	// repl
+	reader := bufio.NewReader(os.Stdin)
+	for {
+
+		fmt.Print("##> GET", args.endpoint, "")
+		path, err := reader.ReadString('\n')
+		if err != nil {
+			fmt.Println("  ERROR: failed to read path:", err)
+			continue
+		}
+		path = strings.TrimSpace(path)
+		if path == "" {
+			continue
+		}
+		if path == "q" || path == "quit" || path == "exit" || path == "halt" {
+			break
+		}
+		err = get(args, path)
+		if err != nil {
+			fmt.Println("  ERROR: request failed:", err)
+		}
+	}
+
 	// logout
 	err = logout(args)
 	check("failed to logout", err)
 }
 
-func login(args *args) (string, error) {
-	// post login data
-	user := struct {
-		User     string `json:"username"`
-		Password string `json:"password"`
-	}{
-		User:     args.user,
-		Password: args.password,
-	}
-	postData, err := json.Marshal(&user)
-	if err != nil {
-		return "", err
-	}
-	resp, err := http.Post(args.endpoint+"rest-auth/login",
-		"application/json", bytes.NewReader(postData))
-	if err != nil {
-		return "", err
-	}
-	if resp.StatusCode != http.StatusOK {
-		return "", errors.New("login failed: " + resp.Status)
-	}
-
-	// read key from response
-	defer resp.Body.Close()
-	respData, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return "", err
-	}
-	var key struct {
-		Key string `json:"key"`
-	}
-	if err := json.Unmarshal(respData, &key); err != nil {
-		return "", err
-	}
-	return key.Key, nil
-}
-
-func logout(args *args) error {
-	url := args.endpoint + "rest-auth/logout"
-	fmt.Println("Logout:")
-	fmt.Println("  POST", url)
-	req, err := http.NewRequest(http.MethodPost, url, nil)
+func get(args *args, path string) error {
+	url := args.endpoint + path
+	fmt.Println("  GET", url)
+	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
 		return err
 	}
@@ -86,6 +70,16 @@ func logout(args *args) error {
 	if err != nil {
 		return err
 	}
-	fmt.Println("  response: " + resp.Status)
+	fmt.Println("  status:", resp.Status)
+
+	if resp.Body == nil {
+		return nil
+	}
+	defer resp.Body.Close()
+	data, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+	fmt.Println(string(data))
 	return nil
 }
