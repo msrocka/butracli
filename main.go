@@ -2,6 +2,8 @@ package main
 
 import (
 	"bufio"
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -34,7 +36,7 @@ func main() {
 	reader := bufio.NewReader(os.Stdin)
 	for {
 
-		fmt.Print("##> GET", args.endpoint, "")
+		fmt.Print("##> GET ", args.endpoint, "  ")
 		path, err := reader.ReadString('\n')
 		if err != nil {
 			fmt.Println("  ERROR: failed to read path:", err)
@@ -80,6 +82,11 @@ func get(args *args, path string) error {
 	if err != nil {
 		return err
 	}
-	fmt.Println(string(data))
+	var formatted bytes.Buffer
+	err = json.Indent(&formatted, data, "", "  ")
+	if err != nil {
+		return err
+	}
+	fmt.Println(formatted.String())
 	return nil
 }
