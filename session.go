@@ -75,10 +75,10 @@ func (s *Session) logout() error {
 	return nil
 }
 
-func (s *Session) get(path string) error {
+func (s *Session) request(method, path string) error {
 	url := s.Endpoint + path
-	fmt.Println("  GET", url)
-	req, err := http.NewRequest(http.MethodGet, url, nil)
+	fmt.Println(" ", method, url)
+	req, err := http.NewRequest(method, url, nil)
 	if err != nil {
 		return err
 	}

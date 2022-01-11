@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
+	"net/http"
 	"os"
 	"strings"
 )
@@ -99,10 +100,11 @@ func readCommand(r *bufio.Reader) (*command, error) {
 }
 
 func (c *command) exec(s *Session) error {
-
 	switch strings.ToUpper(c.method) {
 	case "GET":
-		return s.get(c.path)
+		return s.request(http.MethodGet, c.path)
+	case "DELETE":
+		return s.request(http.MethodDelete, c.path)
 	default:
 		return errors.New("invalid/unsupported HTTP method: " + c.method)
 	}
