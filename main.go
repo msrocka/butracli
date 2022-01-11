@@ -2,11 +2,8 @@ package main
 
 import (
 	"bufio"
-	"bytes"
-	"encoding/json"
+	"errors"
 	"fmt"
-	"io/ioutil"
-	"net/http"
 	"os"
 	"strings"
 )
@@ -33,22 +30,18 @@ func main() {
 	reader := bufio.NewReader(os.Stdin)
 	for {
 
-		fmt.Print("##> GET ", session.Endpoint, "  ")
-		path, err := reader.ReadString('\n')
+		fmt.Print("##> ")
+		cmd, err := readCommand(reader)
 		if err != nil {
-			fmt.Println("  ERROR: failed to read path:", err)
+			fmt.Println("  ERROR: failed to read command:", err)
 			continue
 		}
-		path = strings.TrimSpace(path)
-		if path == "" {
-			continue
-		}
-		if path == "q" || path == "quit" || path == "exit" || path == "halt" {
+		if cmd.isExit() {
 			break
 		}
-		err = get(session, path)
+		err = cmd.exec(session)
 		if err != nil {
-			fmt.Println("  ERROR: request failed:", err)
+			fmt.Println("  ERROR: ", err)
 		}
 	}
 
@@ -57,33 +50,61 @@ func main() {
 	check("failed to logout", err)
 }
 
-func get(session *Session, path string) error {
-	url := session.Endpoint + path
-	fmt.Println("  GET", url)
-	req, err := http.NewRequest(http.MethodGet, url, nil)
-	if err != nil {
-		return err
-	}
-	req.Header.Set("Authorization", "Bearer "+session.ID)
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return err
-	}
-	fmt.Println("  status:", resp.Status)
+type command struct {
+	method string
+	path   string
+	data   string
+}
 
-	if resp.Body == nil {
-		return nil
+func (c *command) isExit() bool {
+	switch c.method {
+	case "q", "quit", "exit", "halt", "end":
+		return true
+	default:
+		return false
 	}
-	defer resp.Body.Close()
-	data, err := ioutil.ReadAll(resp.Body)
+}
+
+func readCommand(r *bufio.Reader) (*command, error) {
+
+	line, err := r.ReadString('\n')
 	if err != nil {
-		return err
+		return nil, err
 	}
-	var formatted bytes.Buffer
-	err = json.Indent(&formatted, data, "", "  ")
-	if err != nil {
-		return err
+	parts := strings.Split(line, " ")
+
+	cmd := &command{}
+	k := 0
+	for i := range parts {
+		s := strings.TrimSpace(parts[i])
+		if s == "" {
+			continue
+		}
+		switch k {
+		case 0:
+			cmd.method = s
+		case 1:
+			cmd.path = strings.TrimLeft(s, "/")
+		case 2:
+			cmd.data += " " + s
+		}
+		k++
 	}
-	fmt.Println(formatted.String())
-	return nil
+
+	if cmd.method == "" {
+		return nil, errors.New("command is empty")
+	}
+
+	return cmd, nil
+}
+
+func (c *command) exec(s *Session) error {
+
+	switch strings.ToUpper(c.method) {
+	case "GET":
+		return s.get(c.path)
+	default:
+		return errors.New("invalid/unsupported HTTP method: " + c.method)
+	}
+
 }

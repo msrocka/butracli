@@ -71,6 +71,37 @@ func (s *Session) logout() error {
 	if err != nil {
 		return err
 	}
-	fmt.Println("Logged out; status=" + resp.Status)
+	fmt.Println("Logged out; " + resp.Status)
+	return nil
+}
+
+func (s *Session) get(path string) error {
+	url := s.Endpoint + path
+	fmt.Println("  GET", url)
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Authorization", "Bearer "+s.ID)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	fmt.Println("  status:", resp.Status)
+
+	if resp.Body == nil {
+		return nil
+	}
+	defer resp.Body.Close()
+	data, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+	var formatted bytes.Buffer
+	err = json.Indent(&formatted, data, "", "  ")
+	if err != nil {
+		return err
+	}
+	fmt.Println(formatted.String())
 	return nil
 }
