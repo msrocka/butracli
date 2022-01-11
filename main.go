@@ -22,21 +22,18 @@ func check(info string, err error) {
 func main() {
 
 	// parse auth-data from program args
-	args, err := parseArgs()
-	check("failed to parse program arguments", err)
+	creds, err := readCredentials()
+	check("failed to read credentials", err)
 
 	// login
-	authKey, err := login(args)
+	session, err := login(creds)
 	check("failed to login", err)
-	args.authKey = authKey
-	fmt.Println("Connected to the BuildingTransparency API")
-	fmt.Println("  with authentication token =", authKey)
 
 	// repl
 	reader := bufio.NewReader(os.Stdin)
 	for {
 
-		fmt.Print("##> GET ", args.endpoint, "  ")
+		fmt.Print("##> GET ", session.Endpoint, "  ")
 		path, err := reader.ReadString('\n')
 		if err != nil {
 			fmt.Println("  ERROR: failed to read path:", err)
@@ -49,25 +46,25 @@ func main() {
 		if path == "q" || path == "quit" || path == "exit" || path == "halt" {
 			break
 		}
-		err = get(args, path)
+		err = get(session, path)
 		if err != nil {
 			fmt.Println("  ERROR: request failed:", err)
 		}
 	}
 
 	// logout
-	err = logout(args)
+	err = session.logout()
 	check("failed to logout", err)
 }
 
-func get(args *args, path string) error {
-	url := args.endpoint + path
+func get(session *Session, path string) error {
+	url := session.Endpoint + path
 	fmt.Println("  GET", url)
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
 		return err
 	}
-	req.Header.Set("Authorization", "Bearer "+args.authKey)
+	req.Header.Set("Authorization", "Bearer "+session.ID)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return err
